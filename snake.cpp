@@ -78,7 +78,6 @@ class Snake {
         SnakeSegment *tail;
         std::tuple<int,int> direction = directions[2];  // right
         bool justAte = false;
-        bool dead = false;
 
 };
 
@@ -167,16 +166,16 @@ int Snake::countSnake( void ) {
 
 /*
  * Processes user input to change direction or exit the game.
+ * Returns true if the player pressed a non arrow key,
+ * hopefully they wanted to quit...
  */
-void processInput( Snake *snake ) {
-    keypad(stdscr, TRUE);
-    nodelay(stdscr, TRUE);
+bool processInput( Snake *snake ) {
+    keypad(stdscr, TRUE);  // allow arrow keys
+    nodelay(stdscr, TRUE);  // dont block the game with i/o
     int ch;
     if ((ch = getch()) == ERR){}
     else {
-        if (snake->dead) {
-            return;
-        }
+        flushinp(); // don't buffer inputs, its weird..
         switch (ch) {
             case KEY_UP:
                 snake->direction = directions[0];
@@ -191,10 +190,11 @@ void processInput( Snake *snake ) {
                 snake->direction = directions[3];
                 break;
             default:
-                snake->dead = true;
+                return true;
                 break;
         }
     }
+    return false;
 }
 
 /*
@@ -245,9 +245,12 @@ void gameOver(int score) {
  * Prints the game state.
  */
 bool gameStep(WINDOW *win, int **board, Snake *snake, Pickup p) {
-    processInput(snake);
-    if (snake->move(p))
+    if (processInput(snake)) {
         return true;
+    }
+    if (snake->move(p)) {
+        return true;
+    }
     printBoard(win, board, snake, p);
     return false;
 }
@@ -257,9 +260,10 @@ int main(int argc, char const *argv[]) {
 
     // Curses Setup
     initscr();
-    cbreak();
-    noecho();
-    curs_set(0);
+    raw(); // cbreak alternative
+    noecho();  // hide character echo
+
+    curs_set(0); // hide the cursor
     WINDOW *win = newwin(B_SIZE, B_SIZE*2, LINES/2-B_SIZE/2, COLS/2-B_SIZE);
 
     // 2d representation of the board - for printing purposes
@@ -278,10 +282,11 @@ int main(int argc, char const *argv[]) {
         sleep(1);
     }
     // Game over
+    clear();
+    wrefresh(win);
     delwin(win);
     gameOver(snake->countSnake());
 
-    clear();
     refresh();
     endwin(); // <-- Do this else ncurses will curse your terminal
     return 0;
